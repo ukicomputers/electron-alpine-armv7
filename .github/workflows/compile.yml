@@ -20,17 +20,16 @@ jobs:
         shell: alpine.sh --root {0}
 
       - name: Installing build dependencies
-        run: apk add git \
-                     doas \
-                     alpine-sdk
+        run: apk add git doas alpine-sdk
         shell: alpine.sh --root {0}
 
       - name: Preparing build user
-        run: addgroup abuild && \
-             adduser -S -G abuild abuild && \
-             echo "permit nopass :abuild as root" >> /etc/doas.conf && \
-             mkdir -p /home/abuild/.abuild && \
-             chown -R abuild:abuild /home/abuild
+        run: |
+          addgroup abuild
+          adduser -S -G abuild abuild
+          echo "permit nopass :abuild as root" >> /etc/doas.conf
+          mkdir -p /home/abuild/.abuild
+          chown -R abuild:abuild /home/abuild
         shell: alpine.sh --root {0}
 
       - name: Generating build keys
