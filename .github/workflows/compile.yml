@@ -25,7 +25,7 @@ jobs:
 
       - name: Preparing build user
         run: |
-          addgroup abuild
+          addgroup abuild || true
           adduser -S -G abuild abuild
           echo "permit nopass :abuild as root" >> /etc/doas.conf
           mkdir -p /home/abuild/.abuild
