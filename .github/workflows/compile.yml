@@ -1,0 +1,63 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 1 * *"
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preparing Alpine
+        uses: jirutka/setup-alpine@v1
+        id: alpine
+        with:
+          branch: latest-stable
+          arch: armv7
+          extra-repositories: http://dl-cdn.alpinelinux.org/alpine/edge/testing
+
+      - name: Updating apk cache
+        run: apk update
+        shell: alpine.sh {0}
+
+      - name: Installing build dependencies
+        run: apk add git \
+                     doas \
+                     alpine-sdk
+        shell: alpine.sh {0}
+
+      - name: Preparing build user
+        run: addgroup abuild && \
+             adduser -S -G abuild abuild && \
+             echo "permit nopass :abuild as root" >> /etc/doas.conf && \
+             mkdir -p /home/abuild/.abuild && \
+             chown -R abuild:abuild /home/abuild
+        shell: alpine.sh {0}
+
+      - name: Generating build keys
+        run: su abuild -s /bin/sh -c "abuild-keygen -a -i -n"
+        shell: alpine.sh {0}
+      
+      - name: Get Electron code
+        run: su abuild -s /bin/sh -c "git clone --depth=1 https://gitlab.alpinelinux.org/alpine/aports.git /home/abuild/aports"
+        shell: alpine.sh {0}
+
+      - name: Fix architectures
+        run: su abuild -s /bin/sh -c "sed -i.bak '/^arch=/ s|^\(arch=\"[^\"]*\)\"|\1 armv7\"|' /home/abuild/aports/testing/electron/APKBUILD"
+        shell: alpine.sh {0}
+
+      - name: Building
+        run: su abuild -s /bin/sh -c "cd /home/abuild/aports/testing/electron && abuild -r"
+        shell: alpine.sh {0}
+
+      - name: Get package version
+        id: version
+        run: |
+          . /home/abuild/aports/testing/electron/APKBUILD
+          echo "version=${pkgver}-${pkgrel}" >> $GITHUB_OUTPUT
+        shell: alpine.sh {0}
+      
+      - name: Releasing
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          files: ${{ steps.alpine.outputs['root-path'] }}/home/abuild/packages/testing/armv7/*.apk
